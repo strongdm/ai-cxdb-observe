@@ -6,6 +6,7 @@ package agentssdk
 import (
 	"context"
 	"log"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/strongdm/ai-agents-sdk/pkg/agents"
@@ -19,6 +20,7 @@ type WrappedRunner struct {
 	collector   aisen.Collector
 	enrichments EnrichmentStore
 	logger      *log.Logger
+	startTime   time.Time
 }
 
 // NewWrappedRunner creates a new WrappedRunner that wraps the given Runner.
@@ -34,6 +36,7 @@ func NewWrappedRunner(inner *agents.Runner, collector aisen.Collector, store Enr
 		collector:   collector,
 		enrichments: store,
 		logger:      logger,
+		startTime:   time.Now(),
 	}
 }
 
@@ -46,10 +49,13 @@ func (w *WrappedRunner) Run(ctx context.Context, agent *agents.Agent, input stri
 	// Extract context ID from session if it implements ContextIDProvider
 	contextID := w.extractContextID(ctx, session)
 
+	// Wrap hooks to capture enrichment while preserving user-provided hooks.
+	wrappedCfg := w.wrapRunConfig(cfg)
+
 	// Capture panics
 	defer w.capturePanic(ctx, runID, contextID)
 
-	result, err := w.inner.Run(ctx, agent, input, session, cfg)
+	result, err := w.inner.Run(ctx, agent, input, session, wrappedCfg)
 	if err != nil {
 		w.captureError(ctx, runID, contextID, err)
 	}
@@ -65,10 +71,13 @@ func (w *WrappedRunner) RunOnce(ctx context.Context, agent *agents.Agent, input 
 	// No session in RunOnce, so no context ID extraction
 	var contextID uint64
 
+	// Wrap hooks to capture enrichment while preserving user-provided hooks.
+	wrappedCfg := w.wrapRunConfig(cfg)
+
 	// Capture panics
 	defer w.capturePanic(ctx, runID, contextID)
 
-	result, err := w.inner.RunOnce(ctx, agent, input, cfg)
+	result, err := w.inner.RunOnce(ctx, agent, input, wrappedCfg)
 	if err != nil {
 		w.captureError(ctx, runID, contextID, err)
 	}
@@ -86,10 +95,13 @@ func (w *WrappedRunner) RunStream(ctx context.Context, agent *agents.Agent, inpu
 	// Extract context ID from session if it implements ContextIDProvider
 	contextID := w.extractContextID(ctx, session)
 
+	// Wrap hooks to capture enrichment while preserving user-provided hooks.
+	wrappedCfg := w.wrapRunConfig(cfg)
+
 	// Capture panics
 	defer w.capturePanic(ctx, runID, contextID)
 
-	stream, err := w.inner.RunStream(ctx, agent, input, session, cfg)
+	stream, err := w.inner.RunStream(ctx, agent, input, session, wrappedCfg)
 	if err != nil {
 		w.captureError(ctx, runID, contextID, err)
 		w.enrichments.Delete(runID)
@@ -104,13 +116,28 @@ func (w *WrappedRunner) extractContextID(ctx context.Context, session interface{
 			return id
 		}
 	}
+	// Fallback to context propagation when session cannot provide a context ID.
+	if id, ok := aisen.ContextIDFromContext(ctx); ok {
+		return id
+	}
 	return 0
+}
+
+// wrapRunConfig clones cfg and wraps hooks with HookAdapter for enrichment capture.
+func (w *WrappedRunner) wrapRunConfig(cfg *agents.RunConfig) *agents.RunConfig {
+	var cloned agents.RunConfig
+	if cfg != nil {
+		cloned = *cfg
+	}
+	cloned.Hooks = NewHookAdapter(w.enrichments, cloned.Hooks, w.logger)
+	return &cloned
 }
 
 // captureError records an error event with enrichment data.
 func (w *WrappedRunner) captureError(ctx context.Context, runID string, contextID uint64, err error) {
 	enrichment, _ := w.enrichments.Get(runID)
 	event := buildErrorEvent(err, contextID, enrichment)
+	event.SystemState = aisen.CaptureSystemState(w.startTime)
 	w.safeRecord(ctx, event)
 }
 
@@ -119,6 +146,7 @@ func (w *WrappedRunner) capturePanic(ctx context.Context, runID string, contextI
 	if r := recover(); r != nil {
 		enrichment, _ := w.enrichments.Get(runID)
 		event := buildPanicEvent(r, contextID, enrichment)
+		event.SystemState = aisen.CaptureSystemState(w.startTime)
 		w.safeRecord(ctx, event)
 		panic(r)
 	}

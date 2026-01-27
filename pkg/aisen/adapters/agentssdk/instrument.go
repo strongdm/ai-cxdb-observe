@@ -5,6 +5,7 @@ package agentssdk
 
 import (
 	"log"
+	"time"
 
 	"github.com/strongdm/ai-agents-sdk/pkg/agents"
 	"github.com/strongdm/ai-cxdb-observe/pkg/aisen"
@@ -43,6 +44,7 @@ func Instrument(baseRunner *agents.Runner, collector aisen.Collector, opts ...Wr
 		inner:       baseRunner,
 		collector:   collector,
 		enrichments: NewEnrichmentStore(),
+		startTime:   time.Now(),
 	}
 
 	for _, opt := range opts {

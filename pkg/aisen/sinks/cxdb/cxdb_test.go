@@ -8,19 +8,21 @@ import (
 	"time"
 
 	"github.com/strongdm/ai-cxdb-observe/pkg/aisen"
+	cxdbclient "github.com/strongdm/ai-cxdb/clients/go"
+	cxdtypes "github.com/strongdm/ai-cxdb/clients/go/types"
 )
 
 // mockCXDBClient is a test double for the cxdb client.
 type mockCXDBClient struct {
 	mu             sync.Mutex
 	createContexts []uint64 // baseTurnIDs passed to CreateContext
-	appendRequests []*AppendRequest
+	appendRequests []*cxdbclient.AppendRequest
 	nextContextID  uint64
 	createErr      error
 	appendErr      error
 }
 
-func (m *mockCXDBClient) CreateContext(ctx context.Context, baseTurnID uint64) (*ContextHead, error) {
+func (m *mockCXDBClient) CreateContext(ctx context.Context, baseTurnID uint64) (*cxdbclient.ContextHead, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.createErr != nil {
@@ -28,31 +30,31 @@ func (m *mockCXDBClient) CreateContext(ctx context.Context, baseTurnID uint64) (
 	}
 	m.createContexts = append(m.createContexts, baseTurnID)
 	m.nextContextID++
-	return &ContextHead{
+	return &cxdbclient.ContextHead{
 		ContextID:  m.nextContextID,
 		HeadTurnID: 0,
 		HeadDepth:  0,
 	}, nil
 }
 
-func (m *mockCXDBClient) AppendTurn(ctx context.Context, req *AppendRequest) (*AppendResult, error) {
+func (m *mockCXDBClient) AppendTurn(ctx context.Context, req *cxdbclient.AppendRequest) (*cxdbclient.AppendResult, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.appendErr != nil {
 		return nil, m.appendErr
 	}
 	m.appendRequests = append(m.appendRequests, req)
-	return &AppendResult{
+	return &cxdbclient.AppendResult{
 		ContextID: req.ContextID,
 		TurnID:    1,
 		Depth:     1,
 	}, nil
 }
 
-func (m *mockCXDBClient) getAppendRequests() []*AppendRequest {
+func (m *mockCXDBClient) getAppendRequests() []*cxdbclient.AppendRequest {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	result := make([]*AppendRequest, len(m.appendRequests))
+	result := make([]*cxdbclient.AppendRequest, len(m.appendRequests))
 	copy(result, m.appendRequests)
 	return result
 }
@@ -63,6 +65,24 @@ func (m *mockCXDBClient) getCreateContextCalls() []uint64 {
 	result := make([]uint64, len(m.createContexts))
 	copy(result, m.createContexts)
 	return result
+}
+
+func decodeConversationItem(t *testing.T, payload []byte) cxdtypes.ConversationItem {
+	t.Helper()
+	var item cxdtypes.ConversationItem
+	if err := cxdbclient.DecodeMsgpackInto(payload, &item); err != nil {
+		t.Fatalf("DecodeMsgpackInto failed: %v", err)
+	}
+	return item
+}
+
+func decodeDetailsJSON(t *testing.T, content string) map[string]any {
+	t.Helper()
+	var details map[string]any
+	if err := json.Unmarshal([]byte(content), &details); err != nil {
+		t.Fatalf("details JSON unmarshal failed: %v", err)
+	}
+	return details
 }
 
 func TestCXDBSink_ImplementsSinkInterface(t *testing.T) {
@@ -105,6 +125,15 @@ func TestCXDBSink_Write_WithContextID_AppendsTurn(t *testing.T) {
 	if req.ContextID != 12345 {
 		t.Errorf("AppendRequest.ContextID = %d, want 12345", req.ContextID)
 	}
+	if req.TypeID != cxdtypes.TypeIDConversationItem {
+		t.Errorf("TypeID = %q, want %q", req.TypeID, cxdtypes.TypeIDConversationItem)
+	}
+	if req.TypeVersion != cxdtypes.TypeVersionConversationItem {
+		t.Errorf("TypeVersion = %d, want %d", req.TypeVersion, cxdtypes.TypeVersionConversationItem)
+	}
+	if req.IdempotencyKey != "evt-123" {
+		t.Errorf("IdempotencyKey = %q, want %q", req.IdempotencyKey, "evt-123")
+	}
 }
 
 func TestCXDBSink_Write_WithoutContextID_CreatesOrphan(t *testing.T) {
@@ -130,14 +159,24 @@ func TestCXDBSink_Write_WithoutContextID_CreatesOrphan(t *testing.T) {
 		t.Fatalf("Expected 1 create context call, got %d", len(createCalls))
 	}
 
-	// Should append to the newly created context
 	appendReqs := client.getAppendRequests()
 	if len(appendReqs) != 1 {
 		t.Fatalf("Expected 1 append request, got %d", len(appendReqs))
 	}
+
+	item := decodeConversationItem(t, appendReqs[0].Payload)
+	if item.ContextMetadata == nil {
+		t.Fatalf("ContextMetadata should be set for orphan contexts")
+	}
+	if item.ContextMetadata.ClientTag == "" {
+		t.Errorf("ClientTag should be set for orphan contexts")
+	}
+	if len(item.ContextMetadata.Labels) == 0 {
+		t.Errorf("Labels should be set for orphan contexts")
+	}
 }
 
-func TestCXDBSink_Write_PayloadFormat(t *testing.T) {
+func TestCXDBSink_Write_PayloadFormat_CanonicalTypes(t *testing.T) {
 	client := &mockCXDBClient{}
 	sink := NewCXDBSink(client)
 
@@ -166,33 +205,58 @@ func TestCXDBSink_Write_PayloadFormat(t *testing.T) {
 	}
 
 	req := appendReqs[0]
+	item := decodeConversationItem(t, req.Payload)
 
-	// Verify TypeID and TypeVersion
-	if req.TypeID != TypeIDConversationItem {
-		t.Errorf("TypeID = %q, want %q", req.TypeID, TypeIDConversationItem)
+	if item.ItemType != cxdtypes.ItemTypeSystem {
+		t.Errorf("ItemType = %q, want %q", item.ItemType, cxdtypes.ItemTypeSystem)
 	}
-	if req.TypeVersion != TypeVersionConversationItem {
-		t.Errorf("TypeVersion = %d, want %d", req.TypeVersion, TypeVersionConversationItem)
+	if item.Status != cxdtypes.ItemStatusComplete {
+		t.Errorf("Status = %q, want %q", item.Status, cxdtypes.ItemStatusComplete)
+	}
+	if item.System == nil {
+		t.Fatalf("System message should be present")
+	}
+	if item.System.Kind != cxdtypes.SystemKindError {
+		t.Errorf("System.Kind = %q, want %q", item.System.Kind, cxdtypes.SystemKindError)
 	}
 
-	// Verify IdempotencyKey
-	if req.IdempotencyKey != "evt-456" {
-		t.Errorf("IdempotencyKey = %q, want %q", req.IdempotencyKey, "evt-456")
+	details := decodeDetailsJSON(t, item.System.Content)
+	if details["event_id"] != "evt-456" {
+		t.Errorf("event_id = %v, want evt-456", details["event_id"])
+	}
+	if details["fingerprint"] != "fp123" {
+		t.Errorf("fingerprint = %v, want fp123", details["fingerprint"])
+	}
+	if details["operation"] != "tool" {
+		t.Errorf("operation = %v, want tool", details["operation"])
+	}
+	if details["agent_name"] != "agent1" {
+		t.Errorf("agent_name = %v, want agent1", details["agent_name"])
+	}
+	if details["tool_name"] != "WebSearch" {
+		t.Errorf("tool_name = %v, want WebSearch", details["tool_name"])
 	}
 
-	// Payload should be non-empty (msgpack encoded)
-	if len(req.Payload) == 0 {
-		t.Error("Payload should not be empty")
+	// Non-orphan contexts should not include context metadata.
+	if item.ContextMetadata != nil {
+		t.Errorf("ContextMetadata should be nil for non-orphan contexts")
 	}
 }
 
-func TestCXDBSink_WithOrphanLabels(t *testing.T) {
+func TestCXDBSink_WithOrphanLabels_AndClientTag(t *testing.T) {
 	client := &mockCXDBClient{}
-	sink := NewCXDBSink(client, WithOrphanLabels([]string{"error", "critical"}))
+	sink := NewCXDBSink(
+		client,
+		WithOrphanLabels([]string{"error", "critical"}),
+		WithClientTag("aisen-e2e"),
+	)
 
 	event := aisen.ErrorEvent{
-		EventID:  "evt-123",
-		Severity: aisen.SeverityError,
+		EventID:   "evt-789",
+		Timestamp: time.Now(),
+		Severity:  aisen.SeverityError,
+		ErrorType: "test",
+		Message:   "boom",
 		// No ContextID - will create orphan
 	}
 
@@ -201,10 +265,20 @@ func TestCXDBSink_WithOrphanLabels(t *testing.T) {
 		t.Fatalf("Write returned error: %v", err)
 	}
 
-	// Verify that labels were configured (they're used in metadata)
 	appendReqs := client.getAppendRequests()
 	if len(appendReqs) != 1 {
 		t.Fatalf("Expected 1 append request, got %d", len(appendReqs))
+	}
+
+	item := decodeConversationItem(t, appendReqs[0].Payload)
+	if item.ContextMetadata == nil {
+		t.Fatalf("ContextMetadata should be set for orphan contexts")
+	}
+	if item.ContextMetadata.ClientTag != "aisen-e2e" {
+		t.Errorf("ClientTag = %q, want %q", item.ContextMetadata.ClientTag, "aisen-e2e")
+	}
+	if len(item.ContextMetadata.Labels) != 2 || item.ContextMetadata.Labels[1] != "critical" {
+		t.Errorf("Labels = %v, want %v", item.ContextMetadata.Labels, []string{"error", "critical"})
 	}
 }
 
@@ -215,87 +289,5 @@ func TestCXDBSink_Flush(t *testing.T) {
 	err := sink.Flush(context.Background())
 	if err != nil {
 		t.Errorf("Flush returned error: %v", err)
-	}
-}
-
-func TestCXDBSink_Close(t *testing.T) {
-	client := &mockCXDBClient{}
-	sink := NewCXDBSink(client)
-
-	err := sink.Close()
-	if err != nil {
-		t.Errorf("Close returned error: %v", err)
-	}
-}
-
-func TestCXDBSink_ErrorDetails_JSON(t *testing.T) {
-	client := &mockCXDBClient{}
-	sink := NewCXDBSink(client)
-
-	contextID := uint64(100)
-	turnDepth := 5
-	tokensWasted := int64(1000)
-	event := aisen.ErrorEvent{
-		EventID:      "evt-json-test",
-		Timestamp:    time.Date(2025, 1, 26, 12, 0, 0, 0, time.UTC),
-		Fingerprint:  "fp-test",
-		Severity:     aisen.SeverityCrash,
-		ErrorType:    "panic",
-		Message:      "nil pointer",
-		StackTrace:   "stack trace here",
-		Operation:    "llm",
-		AgentName:    "testAgent",
-		ToolName:     "testTool",
-		ContextID:    &contextID,
-		TurnDepth:    &turnDepth,
-		TokensWasted: &tokensWasted,
-		Metadata:     map[string]string{"key": "value"},
-	}
-
-	sink.Write(context.Background(), event)
-
-	// Extract and verify the JSON content from the payload
-	// This tests that error details are properly JSON-encoded
-	appendReqs := client.getAppendRequests()
-	if len(appendReqs) != 1 {
-		t.Fatalf("Expected 1 append request, got %d", len(appendReqs))
-	}
-
-	// The payload contains a ConversationItem with System.Content as JSON
-	// We can't easily decode msgpack here, but we can verify the request was made
-	if len(appendReqs[0].Payload) == 0 {
-		t.Error("Payload should contain encoded ConversationItem")
-	}
-}
-
-// Test that buildErrorDetails produces valid JSON
-func TestBuildErrorDetails_ValidJSON(t *testing.T) {
-	event := aisen.ErrorEvent{
-		EventID:     "evt-1",
-		Fingerprint: "fp-1",
-		Severity:    aisen.SeverityError,
-		ErrorType:   "test",
-		Message:     "test message",
-		StackTrace:  "line1\nline2",
-		Operation:   "tool",
-		AgentName:   "agent",
-		ToolName:    "tool",
-		Metadata:    map[string]string{"k": "v"},
-	}
-
-	details := buildErrorDetails(event)
-
-	// Should be valid JSON
-	var parsed map[string]interface{}
-	if err := json.Unmarshal([]byte(details), &parsed); err != nil {
-		t.Errorf("buildErrorDetails produced invalid JSON: %v", err)
-	}
-
-	// Check expected fields
-	if parsed["event_id"] != "evt-1" {
-		t.Errorf("event_id = %v, want %q", parsed["event_id"], "evt-1")
-	}
-	if parsed["severity"] != "error" {
-		t.Errorf("severity = %v, want %q", parsed["severity"], "error")
 	}
 }

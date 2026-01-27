@@ -7,57 +7,15 @@ import (
 	"fmt"
 
 	"github.com/strongdm/ai-cxdb-observe/pkg/aisen"
-	"github.com/vmihailenco/msgpack/v5"
+	cxdbclient "github.com/strongdm/ai-cxdb/clients/go"
+	cxdtypes "github.com/strongdm/ai-cxdb/clients/go/types"
 )
-
-// Type constants matching ai-cxdb/clients/go/types/conversation.go
-const (
-	// TypeIDConversationItem is the type ID for ConversationItem.
-	TypeIDConversationItem = "cxdb.ConversationItem"
-
-	// TypeVersionConversationItem is the current schema version.
-	TypeVersionConversationItem uint32 = 3
-
-	// ItemType constants
-	itemTypeSystem = "system"
-
-	// ItemStatus constants
-	itemStatusComplete = "complete"
-
-	// SystemKind constants
-	systemKindError = "error"
-)
-
-// ContextHead represents a context's current state.
-type ContextHead struct {
-	ContextID  uint64
-	HeadTurnID uint64
-	HeadDepth  uint32
-}
-
-// AppendRequest contains parameters for appending a turn.
-type AppendRequest struct {
-	ContextID      uint64
-	ParentTurnID   uint64
-	TypeID         string
-	TypeVersion    uint32
-	Payload        []byte
-	IdempotencyKey string
-}
-
-// AppendResult contains the result of an append operation.
-type AppendResult struct {
-	ContextID   uint64
-	TurnID      uint64
-	Depth       uint32
-	PayloadHash [32]byte
-}
 
 // CXDBClient is the minimal interface for cxdb client operations.
 // The real *cxdb.Client satisfies this interface.
 type CXDBClient interface {
-	CreateContext(ctx context.Context, baseTurnID uint64) (*ContextHead, error)
-	AppendTurn(ctx context.Context, req *AppendRequest) (*AppendResult, error)
+	CreateContext(ctx context.Context, baseTurnID uint64) (*cxdbclient.ContextHead, error)
+	AppendTurn(ctx context.Context, req *cxdbclient.AppendRequest) (*cxdbclient.AppendResult, error)
 }
 
 // CXDBSinkOption configures the CXDB sink.
@@ -123,20 +81,21 @@ func (s *cxdbSink) Write(ctx context.Context, event aisen.ErrorEvent) error {
 		isOrphan = true
 	}
 
-	// Build the ConversationItem payload
+	// Build the canonical ConversationItem payload.
 	item := s.buildConversationItem(event, isOrphan)
 
-	// Encode to msgpack
-	payload, err := encodeMsgpack(item)
+	// Encode to msgpack using the official cxdb encoder.
+	payload, err := cxdbclient.EncodeMsgpack(item)
 	if err != nil {
 		return fmt.Errorf("encode payload: %w", err)
 	}
 
-	// Append to context
-	req := &AppendRequest{
+	// Append to context using canonical type identifiers.
+	req := &cxdbclient.AppendRequest{
 		ContextID:      contextID,
-		TypeID:         TypeIDConversationItem,
-		TypeVersion:    TypeVersionConversationItem,
+		ParentTurnID:   0,
+		TypeID:         cxdtypes.TypeIDConversationItem,
+		TypeVersion:    cxdtypes.TypeVersionConversationItem,
 		Payload:        payload,
 		IdempotencyKey: event.EventID,
 	}
@@ -149,34 +108,12 @@ func (s *cxdbSink) Write(ctx context.Context, event aisen.ErrorEvent) error {
 	return nil
 }
 
-// conversationItem mirrors types.ConversationItem structure for encoding.
-// Uses msgpack tags matching the cxdb types package.
-type conversationItem struct {
-	ItemType        string            `msgpack:"1"`
-	Status          string            `msgpack:"2"`
-	Timestamp       int64             `msgpack:"3"`
-	ID              string            `msgpack:"4"`
-	System          *systemMessage    `msgpack:"9,omitempty"`
-	ContextMetadata *contextMetadata  `msgpack:"15,omitempty"`
-}
-
-type systemMessage struct {
-	Kind    string `msgpack:"1"`
-	Title   string `msgpack:"2,omitempty"`
-	Content string `msgpack:"3,omitempty"`
-}
-
-type contextMetadata struct {
-	Labels    []string `msgpack:"1,omitempty"`
-	ClientTag string   `msgpack:"2,omitempty"`
-}
-
-// buildConversationItem creates a ConversationItem from an ErrorEvent.
-func (s *cxdbSink) buildConversationItem(event aisen.ErrorEvent, isOrphan bool) *conversationItem {
+// buildConversationItem creates a canonical ConversationItem from an ErrorEvent.
+func (s *cxdbSink) buildConversationItem(event aisen.ErrorEvent, isOrphan bool) *cxdtypes.ConversationItem {
 	// Build title: "error_type: truncated_message"
 	title := event.ErrorType
 	if event.Message != "" {
-		maxMsgLen := 80
+		const maxMsgLen = 80
 		msg := event.Message
 		if len(msg) > maxMsgLen {
 			msg = msg[:maxMsgLen] + "..."
@@ -189,21 +126,21 @@ func (s *cxdbSink) buildConversationItem(event aisen.ErrorEvent, isOrphan bool) 
 		title = title[:97] + "..."
 	}
 
-	item := &conversationItem{
-		ItemType:  itemTypeSystem,
-		Status:    itemStatusComplete,
+	item := &cxdtypes.ConversationItem{
+		ItemType:  cxdtypes.ItemTypeSystem,
+		Status:    cxdtypes.ItemStatusComplete,
 		Timestamp: event.Timestamp.UnixMilli(),
 		ID:        event.EventID,
-		System: &systemMessage{
-			Kind:    systemKindError,
+		System: &cxdtypes.SystemMessage{
+			Kind:    cxdtypes.SystemKindError,
 			Title:   title,
 			Content: buildErrorDetails(event),
 		},
 	}
 
-	// Add context metadata for orphan contexts
+	// Add context metadata for orphan contexts. cxdb expects this on the first turn.
 	if isOrphan {
-		item.ContextMetadata = &contextMetadata{
+		item.ContextMetadata = &cxdtypes.ContextMetadata{
 			Labels:    s.orphanLabels,
 			ClientTag: s.clientTag,
 		}
@@ -214,7 +151,7 @@ func (s *cxdbSink) buildConversationItem(event aisen.ErrorEvent, isOrphan bool) 
 
 // buildErrorDetails encodes the full ErrorEvent as JSON for SystemMessage.Content.
 func buildErrorDetails(event aisen.ErrorEvent) string {
-	details := map[string]interface{}{
+	details := map[string]any{
 		"event_id":    event.EventID,
 		"severity":    string(event.Severity),
 		"error_type":  event.ErrorType,
@@ -245,7 +182,7 @@ func buildErrorDetails(event aisen.ErrorEvent) string {
 		details["turn_depth"] = *event.TurnDepth
 	}
 	if event.SystemState != nil {
-		details["system_state"] = map[string]interface{}{
+		details["system_state"] = map[string]any{
 			"memory_bytes":    event.SystemState.MemoryBytes,
 			"goroutine_count": event.SystemState.GoroutineCount,
 			"uptime_ms":       event.SystemState.UptimeMs,
@@ -265,11 +202,6 @@ func buildErrorDetails(event aisen.ErrorEvent) string {
 		return fmt.Sprintf(`{"error":"failed to encode details: %s"}`, err)
 	}
 	return string(jsonBytes)
-}
-
-// encodeMsgpack encodes a value to msgpack bytes.
-func encodeMsgpack(v interface{}) ([]byte, error) {
-	return msgpack.Marshal(v)
 }
 
 // Flush is a no-op for the cxdb sink (writes are synchronous).
