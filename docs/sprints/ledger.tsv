@@ -1,0 +1,139 @@
+sprint_id	title	status	created_at	updated_at
+001	Operation History with Full LLM Call Details	in_progress	2026-01-07T00:00:00Z	2026-01-29T00:28:43Z
+002	WAL Write Path + Segment Management	completed	2026-01-07T00:00:00Z	2026-01-07T21:09:46Z
+003	Architecture & Project Layout Hardening	completed	2026-01-07T21:13:09Z	2026-01-07T21:25:49Z
+004	Extract Kernel Crate	completed	2026-01-07T21:46:53Z	2026-01-09T05:46:28Z
+005	Control Plane → State Closed Loop	completed	2026-01-08T19:05:44Z	2026-01-09T05:48:09Z
+006	First Token Flow (Client Credentials)	completed	2026-01-08T19:05:44Z	2026-01-09T05:48:09Z
+007	Authorization Code Flow + ID Tokens	completed	2026-01-08T19:05:44Z	2026-01-09T05:48:09Z
+008	Refresh Token Flow	completed	2026-01-08T19:05:44Z	2026-01-09T05:48:09Z
+009	UserInfo Endpoint	completed	2026-01-08T19:05:44Z	2026-01-09T05:48:09Z
+010	Developer Playground	completed	2026-01-08T19:05:44Z	2026-01-09T05:48:09Z
+011	Workload Identity - Just Enough SPIFFE	completed	2026-01-08T19:05:44Z	2026-01-09T05:48:09Z
+012	Workload Attestation	completed	2026-01-08T19:05:44Z	2026-01-09T05:48:09Z
+013	Unified Principal Model + Passkeys	completed	2026-01-08T19:05:44Z	2026-01-09T05:48:09Z
+014	Playground 2.0 - React Application	completed	2026-01-08T19:05:44Z	2026-01-09T05:48:09Z
+015	WebAuthn Backend Implementation	completed	2026-01-08T19:05:44Z	2026-01-09T05:48:09Z
+016	OAuth + Passkey Integration	completed	2026-01-08T19:05:44Z	2026-01-09T05:48:09Z
+017	macOS Touch ID Attestation (Developer Workstation Identity)	completed	2026-01-08T19:05:44Z	2026-01-09T05:48:09Z
+018	SPIFFE Conformance Test Suite	completed	2026-01-08T00:00:00Z	2026-01-08T19:29:24Z
+019	SSF/CAEP Conformance Test Suite	completed	2026-01-08T19:34:59Z	2026-01-09T05:48:09Z
+020	AuthZEN Conformance Test Suite	completed	2026-01-08T19:34:59Z	2026-01-09T05:48:10Z
+021	Virtual Cluster Core (Resiliency Playground Phase 1)	completed	2026-01-08T19:59:50Z	2026-01-09T05:48:10Z
+022	Real S3 Integration (Resiliency Playground Phase 2)	completed	2026-01-08T19:59:50Z	2026-01-09T05:48:10Z
+023	Passivate/Activate & PITR (Resiliency Playground Phase 3)	completed	2026-01-08T19:59:50Z	2026-01-09T08:13:10Z
+024	Resiliency Playground UI (Phase 4)	completed	2026-01-08T19:59:50Z	2026-01-09T03:54:52Z
+025	IDP-Class Security Architecture	completed	2026-01-09T01:11:21Z	2026-01-09T04:03:26Z
+026	Cryptographic & Attestation Security Hardening	completed	2026-01-09T01:38:15Z	2026-01-09T04:58:25Z
+027	Deep Security Hardening	completed	2026-01-09T01:45:23Z	2026-01-09T06:01:39Z
+028	Protocol, Certificate & Operational Security	completed	2026-01-09T08:06:33Z	2026-01-09T08:06:40Z
+029	Durable Signing Keys + CA Material (Key Epochs)	completed	2026-01-09T18:17:45Z	2026-01-09T18:48:29Z
+030	WAL & Segment Format Hardening (Deterministic + Bounded)	completed	2026-01-09T18:17:45Z	2026-01-09T19:00:33Z
+031	Correct Readiness + Staleness Gating (Edge Safety)	completed	2026-01-09T18:17:45Z	2026-01-09T19:09:51Z
+032	Production Role Gating + Playground Isolation	completed	2026-01-09T18:17:45Z	2026-01-09T19:15:19Z
+033	Storage/Concurrency Hardening (Async Boundaries + Backpressure)	completed	2026-01-09T18:17:45Z	2026-01-09T19:35:35Z
+034	GCP Instance Attestation	completed	2026-01-09T20:07:02Z	2026-01-09T20:30:38Z
+035	Azure Attestation UI Enablement + API Alignment	completed	2026-01-09T20:50:22Z	2026-01-09T21:06:54Z
+036	Session Persistence	completed	2026-01-09T21:03:49Z	2026-01-09T21:43:17Z
+037	CSR-Based X.509 SVID Issuance with Replay-Resistant Attestation	completed	2026-01-09T21:49:31Z	2026-01-09T22:38:33Z
+038	Storage Layer “Just Right” Correctness + Simplification	completed	2026-01-09T21:54:52Z	2026-01-10T00:59:37Z
+039	Absurdly Convenient Onboarding	completed	2026-01-10T01:19:53Z	2026-01-10T01:51:18Z
+040	Onboarding Wizard for /start	completed	2026-01-10T02:33:35Z	2026-01-10T02:59:01Z
+041	Self-Hosted Infrastructure Reconciliation	completed	2026-01-10T04:33:17Z	2026-01-10T04:58:12Z
+042	AWS Provider for Cell Deployment	completed	2026-01-10T05:49:12Z	2026-01-10T06:25:35Z
+043	Codebase Cleanup & Consolidation	completed	2026-01-10T16:37:43Z	2026-01-10T18:22:34Z
+044	Production Infrastructure Migration & First Cell Bootstrap	completed	2026-01-10T20:23:06Z	2026-01-10T21:26:42Z
+045	Self-Aware Global Monitoring System	completed	2026-01-10T20:46:38Z	2026-01-10T23:54:17Z
+046	Dev Environment Infrastructure Bootstrap	completed	2026-01-10T23:54:37Z	2026-01-11T00:26:40Z
+047	Production Multi-Cell Migration (Goodbye K8s)	completed	2026-01-11T00:53:20Z	2026-01-11T04:32:54Z
+048	Dev & Prod Environment Certification	completed	2026-01-11T01:47:03Z	2026-01-11T04:55:03Z
+049	Self-Aware Monitoring - Background Tasks	completed	2026-01-11T06:19:55Z	2026-01-11T06:43:45Z
+050	Within-Cell Raft Cluster Formation & Session Replication	completed	2026-01-11T07:44:16Z	2026-01-11T08:50:17Z
+051	Self-Updating Deployment System	completed	2026-01-11T08:36:42Z	2026-01-11T09:23:58Z
+052	Raft Session Replication - Full Integration	completed	2026-01-11T09:06:51Z	2026-01-11T18:06:55Z
+053	Cross-Cell Monitoring Federation	completed	2026-01-11T17:50:00Z	2026-01-12T01:33:07Z
+054	K8s-Based Remote Build System	completed	2026-01-12T01:06:30Z	2026-01-12T01:58:32Z
+055	Build & Deployment Stress Test - Results	completed	2026-01-12T01:49:46Z	2026-01-12T09:03:17Z
+056	K8s Build Pipeline Validation	completed	2026-01-12T09:03:17Z	2026-01-12T10:15:41Z
+057	Multi-Authority Consensus & Monitoring Correctness	completed	2026-01-12T09:16:48Z	2026-01-12T17:54:55Z
+058	Production Correctness - Sessions & Raft State	completed	2026-01-12T17:54:55Z	2026-01-12T18:39:45Z
+059	DNS-Based Peer Discovery for Monitoring	completed	2026-01-12T21:27:35Z	2026-01-12T21:47:13Z
+060	Cattle Architecture - Immutable Infrastructure & Self-Healing	completed	2026-01-12T22:50:04Z	2026-01-13T04:13:43Z
+061	pctl - Unified Operations CLI with Disaster Recovery	completed	2026-01-12T23:03:08Z	2026-01-13T06:34:51Z
+062	Unified Peer Discovery & Consensus Foundation	completed	2026-01-12T23:49:33Z	2026-01-13T06:48:33Z
+063	Consensus-as-Log - Raft as Authoritative Control Plane	completed	2026-01-13T04:40:43Z	2026-01-13T08:06:51Z
+064	S3 Manifest & CAS Head Pointer - Production Durability Model	completed	2026-01-13T05:22:18Z	2026-01-13T09:09:00Z
+065	Role-Based Startup Composition & Plane Enforcement	completed	2026-01-13T05:52:32Z	2026-01-15T01:02:48Z
+066	Kernel Boundaries & Crate Layout Enforcement	completed	2026-01-13T08:02:44Z	2026-01-15T02:31:39Z
+067	Sprint 067	skipped	2026-01-15T07:36:32Z	2026-01-25T23:10:14Z
+068	Sprint 068	skipped	2026-01-15T07:36:32Z	2026-01-25T23:10:14Z
+069	Sprint 069	skipped	2026-01-15T07:36:32Z	2026-01-25T23:10:14Z
+070	Ballast - External Base-Load Service	completed	2026-01-13T23:06:53Z	2026-01-15T04:41:11Z
+071	Peer Discovery Hardening (PeerDirectory + Fast Refresh + Instance Fencing)	completed	2026-01-14T05:43:30Z	2026-01-15T05:09:01Z
+072	Playwright Production E2E Testing Suite	completed	2026-01-15T00:52:48Z	2026-01-15T05:20:26Z
+073	Close Critical Authn/Issuance Gaps	completed	2026-01-15T05:16:14Z	2026-01-15T06:27:18Z
+074	Ephemeral State Durability & Replication	completed	2026-01-15T07:29:50Z	2026-01-15T08:55:19Z
+075	S3 Manifest LSN Tracking for RPO Visibility	completed	2026-01-15T07:34:57Z	2026-01-15T18:54:36Z
+076	Functional Fuzzer CLI with TUI	completed	2026-01-15T17:22:36Z	2026-01-15T20:18:46Z
+077	pctl TUI Dashboard with SVID Authentication	completed	2026-01-15T20:00:21Z	2026-01-17T20:03:10Z
+078	Federated Identity Bootstrap for CLI Tools	completed	2026-01-15T22:29:16Z	2026-01-15T23:10:57Z
+079	Multi-Client Federated Identity with Scope-Based Authorization	completed	2026-01-16T00:01:33Z	2026-01-16T00:13:37Z
+080	Production Instance Stability - Minimal Fix	completed	2026-01-16T02:25:48Z	2026-01-16T03:34:55Z
+081	EC2-Native Self-Healing Peer Discovery	completed	2026-01-16T04:09:23Z	2026-01-16T04:39:19Z
+082	Production Cluster Stabilization - Convergent Boot Architecture	completed	2026-01-16T21:04:03Z	2026-01-17T02:01:16Z
+083	Principalis-Native CLI Authentication	completed	2026-01-17T02:28:09Z	2026-01-17T04:21:14Z
+084	ASG-Aware Discovery & Health Check Resilience	completed	2026-01-17T04:53:53Z	2026-01-17T05:26:16Z
+085	Enhanced Monitoring Dashboard with Progressive Disclosure	completed	2026-01-17T20:13:45Z	2026-01-17T20:17:04Z
+086	Device Auth Flow Resilience & Auto-Accept	completed	2026-01-17T20:13:45Z	2026-01-17T20:27:19Z
+087	Pure EC2 Peer Discovery	completed	2026-01-18T03:26:55Z	2026-01-18T03:47:59Z
+088	Production Configuration Hardening	completed	2026-01-18T06:43:58Z	2026-01-18T07:08:39Z
+089	Device Verification Page Visual Consistency	completed	2026-01-18T07:43:00Z	2026-01-18T07:54:15Z
+090	Raft Durability Gap Analysis + P0 Fixes (Report-Only)	completed	2026-01-18T19:12:17Z	2026-01-19T05:36:27Z
+091	Monitor Dashboard Throughput Metrics & Sparklines	completed	2026-01-19T05:36:27Z	2026-01-19T05:56:49Z
+092	Ballast Production Realization	completed	2026-01-19T06:03:56Z	2026-01-19T08:56:51Z
+093	Dynamic Raft Peer Membership & Stale Node Remediation	completed	2026-01-19T07:25:08Z	2026-01-19T09:16:58Z
+094	Multi-Realm WAL Manifest Support	completed	2026-01-19T09:02:10Z	2026-01-19T09:40:05Z
+095	Distributed Systems Simulation Testing Framework	completed	2026-01-19T09:30:45Z	2026-01-19T17:25:07Z
+096	Memory Observability & Capacity Metrics	completed	2026-01-19T17:54:04Z	2026-01-19T19:40:20Z
+097	Simulation Raft Timing Calibration	completed	2026-01-19T19:09:25Z	2026-01-19T19:52:59Z
+098	Fix DPoP Replay Detection False Positives	completed	2026-01-19T19:31:57Z	2026-01-19T20:20:28Z
+099	Simulation Testing Makefile & Endurance Tests	completed	2026-01-19T20:28:01Z	2026-01-19T21:14:09Z
+100	Fuzz Reliability — Achieve 99%+ Success Rate	completed	2026-01-19T23:20:45Z	2026-01-19T23:51:13Z
+103	Wire Capacity Data in Monitoring Heartbeats	completed	2026-01-20T02:24:07Z	2026-01-20T02:55:53Z
+104	Fast Raft Leader Failure Recovery	completed	2026-01-20T02:59:31Z	2026-01-20T03:41:16Z
+105	Ephemeral Data Locality	completed	2026-01-20T07:01:57Z	2026-01-20T07:21:13Z
+106	SSM-Native Configuration Loading	completed	2026-01-20T07:37:30Z	2026-01-20T08:14:20Z
+107	Raft Learner Pattern for ASG Resilience	completed	2026-01-20T08:16:19Z	2026-01-20T08:41:19Z
+108	Self-Healing Raft Membership & EC2/ASG Convergence	completed	2026-01-20T17:25:00Z	2026-01-20T18:33:13Z
+109	Raft Safety Corrections & Bootstrap Integrity	completed	2026-01-20T19:16:42Z	2026-01-20T21:31:06Z
+110	SPIFFE Workload API & Principalis Leaf	completed	2026-01-20T21:59:00Z	2026-01-21T00:25:11Z
+111	Raft Follower Log Catch-Up & Snapshot Recovery	completed	2026-01-20T22:53:04Z	2026-01-21T07:41:11Z
+112	ASG/Raft Resilience & Graceful Degradation	completed	2026-01-21T05:35:06Z	2026-01-21T05:54:47Z
+113	Raft Membership Deadlock Recovery	completed	2026-01-22T03:53:09Z	2026-01-22T05:19:59Z
+114	Fix Leaderless Recovery State Reset	completed	2026-01-22T05:58:53Z	2026-01-22T07:15:49Z
+115	Zero-Downtime Coordinated Update Protocol	completed	2026-01-22T07:46:08Z	2026-01-22T09:27:59Z
+116	CloudWatch Logs Integration	completed	2026-01-22T07:55:40Z	2026-01-22T10:05:17Z
+117	Persistent Builder with KEDA Scheduling	completed	2026-01-22T18:36:58Z	2026-01-22T21:05:38Z
+118	Self-Exclusion Recovery for Raft Configuration Corruption	completed	2026-01-22T18:37:07Z	2026-01-22T23:40:08Z
+119	Safe Raft Self-Removal on Shutdown	completed	2026-01-22T21:42:45Z	2026-01-23T00:21:10Z
+120	Coordinated Rolling Updates with S3-Based Lock	completed	2026-01-22T23:36:35Z	2026-01-23T01:08:03Z
+121	Phantom Learner and Log Inconsistency Recovery	completed	2026-01-23T02:52:45Z	2026-01-23T03:19:33Z
+122	Raft Membership Simulation Test Framework	completed	2026-01-23T05:17:44Z	2026-01-23T06:32:28Z
+123	Orphan Cluster Recovery (ASG Refresh Resilience)	completed	2026-01-23T06:21:08Z	2026-01-24T08:47:58Z
+124	ASG Sim Fidelity (S3/FS + Prod Timing Gaps)	completed	2026-01-23T21:41:38Z	2026-01-23T22:16:50Z
+125	Hybrid Consistency Architecture	completed	2026-01-24T07:41:26Z	2026-01-25T22:02:32Z
+127	EC2-Authoritative Raft Bootstrap	completed	2026-01-24T21:49:42Z	2026-01-24T22:58:35Z
+128	ASG-Raft Resilience - Belt and Suspenders	completed	2026-01-24T21:49:42Z	2026-01-24T23:32:43Z
+129	S3 Reset Markers & Enhanced Drain Endpoint	completed	2026-01-25T00:06:11Z	2026-01-25T00:53:53Z
+130	Local Store Memory Bounds & Fuzz Stability	completed	2026-01-25T00:19:50Z	2026-01-25T00:54:32Z
+131	Follower Raft Log Compaction	completed	2026-01-25T09:29:16Z	2026-01-25T17:05:46Z
+132	Sprint 132	skipped	2026-01-25T19:41:47Z	2026-01-25T23:10:14Z
+133	Live Cell Health via Direct HTTP + CORS	completed	2026-01-25T20:33:31Z	2026-01-25T22:50:15Z
+134	Memory Leak Root Cause Analysis and Fix	completed	2026-01-25T23:10:14Z	2026-01-25T23:46:09Z
+135	Enforce Staleness Gating for Token Issuance	completed	2026-01-26T02:55:24Z	2026-01-26T05:22:39Z
+136	Document JTI Replay Architecture and Trade-offs	completed	2026-01-26T04:44:30Z	2026-01-26T06:32:35Z
+137	Document Refresh Token Durability Trade-offs	completed	2026-01-26T04:44:30Z	2026-01-27T05:30:24Z
+138	Enforce Write Gating for Edge-Only Nodes	completed	2026-01-26T05:08:10Z	2026-01-27T06:02:23Z
+139	Simulation Suite True-Up	completed	2026-01-26T05:46:36Z	2026-01-27T06:19:50Z
+140	Graceful Leader Handoff During Rolling Updates	completed	2026-01-27T05:28:45Z	2026-01-27T06:38:17Z
+141	Unified Authentication Architecture	completed	2026-01-27T05:48:37Z	2026-01-27T07:35:33Z

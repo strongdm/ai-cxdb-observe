@@ -180,3 +180,113 @@ func TestEnrichment_AllFields(t *testing.T) {
 		t.Error("OperationID not set correctly")
 	}
 }
+
+// TestEnrichmentRecordOperation verifies buffer initialization and recording.
+func TestEnrichmentRecordOperation(t *testing.T) {
+	e := &Enrichment{}
+
+	// Buffer should be nil initially
+	if e.operationHistory != nil {
+		t.Error("operationHistory should be nil initially")
+	}
+
+	// Record first operation - should initialize buffer
+	rec1 := OperationRecord{Kind: "llm", AgentName: "agent1"}
+	e.RecordOperation(rec1)
+
+	// Buffer should now exist
+	if e.operationHistory == nil {
+		t.Fatal("operationHistory should be initialized after first record")
+	}
+
+	// Verify record was added
+	history := e.GetOperationHistory()
+	if len(history) != 1 {
+		t.Fatalf("history length = %d, want 1", len(history))
+	}
+	if history[0].Kind != "llm" {
+		t.Errorf("history[0].Kind = %q, want %q", history[0].Kind, "llm")
+	}
+	if history[0].AgentName != "agent1" {
+		t.Errorf("history[0].AgentName = %q, want %q", history[0].AgentName, "agent1")
+	}
+
+	// Record second operation
+	rec2 := OperationRecord{Kind: "tool", AgentName: "agent2"}
+	e.RecordOperation(rec2)
+
+	history = e.GetOperationHistory()
+	if len(history) != 2 {
+		t.Fatalf("history length = %d, want 2", len(history))
+	}
+	if history[1].AgentName != "agent2" {
+		t.Errorf("history[1].AgentName = %q, want %q", history[1].AgentName, "agent2")
+	}
+}
+
+// TestEnrichmentOperationHistoryIsolation verifies per-run isolation.
+func TestEnrichmentOperationHistoryIsolation(t *testing.T) {
+	store := NewEnrichmentStore()
+
+	// Record operations for run-1
+	store.Update("run-1", func(e *Enrichment) {
+		e.RecordOperation(OperationRecord{Kind: "llm", AgentName: "agent1"})
+		e.RecordOperation(OperationRecord{Kind: "tool", AgentName: "agent1"})
+	})
+
+	// Record operations for run-2
+	store.Update("run-2", func(e *Enrichment) {
+		e.RecordOperation(OperationRecord{Kind: "llm", AgentName: "agent2"})
+	})
+
+	// Verify run-1 history
+	e1, ok := store.Get("run-1")
+	if !ok {
+		t.Fatal("run-1 should exist")
+	}
+	history1 := e1.GetOperationHistory()
+	if len(history1) != 2 {
+		t.Errorf("run-1 history length = %d, want 2", len(history1))
+	}
+	if history1[0].AgentName != "agent1" {
+		t.Errorf("run-1 history[0].AgentName = %q, want %q", history1[0].AgentName, "agent1")
+	}
+
+	// Verify run-2 history
+	e2, ok := store.Get("run-2")
+	if !ok {
+		t.Fatal("run-2 should exist")
+	}
+	history2 := e2.GetOperationHistory()
+	if len(history2) != 1 {
+		t.Errorf("run-2 history length = %d, want 1", len(history2))
+	}
+	if history2[0].AgentName != "agent2" {
+		t.Errorf("run-2 history[0].AgentName = %q, want %q", history2[0].AgentName, "agent2")
+	}
+
+	// Delete run-1 should not affect run-2
+	store.Delete("run-1")
+	e2Again, ok := store.Get("run-2")
+	if !ok {
+		t.Fatal("run-2 should still exist after run-1 deleted")
+	}
+	history2Again := e2Again.GetOperationHistory()
+	if len(history2Again) != 1 {
+		t.Errorf("run-2 history should be unchanged, got length %d", len(history2Again))
+	}
+}
+
+// TestEnrichmentGetOperationHistoryNilBuffer verifies graceful handling of nil buffer.
+func TestEnrichmentGetOperationHistoryNilBuffer(t *testing.T) {
+	e := &Enrichment{}
+
+	// GetOperationHistory should return empty slice when buffer is nil
+	history := e.GetOperationHistory()
+	if history == nil {
+		t.Error("GetOperationHistory should return non-nil slice")
+	}
+	if len(history) != 0 {
+		t.Errorf("GetOperationHistory length = %d, want 0", len(history))
+	}
+}

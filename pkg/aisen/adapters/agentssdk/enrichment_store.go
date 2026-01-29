@@ -25,6 +25,10 @@ type Enrichment struct {
 
 	// OperationID is an identifier for the specific operation.
 	OperationID string
+
+	// operationHistory stores the last N operations (LLM calls, tool calls).
+	// Private field - not exposed in public API to maintain backwards compatibility.
+	operationHistory *operationHistoryBuffer
 }
 
 // EnrichmentStore provides thread-safe storage for per-run enrichment data.
@@ -87,4 +91,28 @@ func (s *inMemoryEnrichmentStore) Delete(runID string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	delete(s.data, runID)
+}
+
+// RecordOperation adds an operation record to the enrichment's history.
+// Initializes the buffer on first call. This method is not part of the
+// EnrichmentStore interface but is available on the concrete Enrichment type.
+func (e *Enrichment) RecordOperation(record OperationRecord) {
+	// Initialize buffer on first use
+	if e.operationHistory == nil {
+		e.operationHistory = &operationHistoryBuffer{
+			maxSize: 10, // Default size, can be made configurable later
+		}
+	}
+	e.operationHistory.Add(record)
+}
+
+// GetOperationHistory returns all operation records in chronological order.
+// Returns an empty slice if no operations have been recorded.
+// This method is not part of the EnrichmentStore interface but is available
+// on the concrete Enrichment type.
+func (e *Enrichment) GetOperationHistory() []OperationRecord {
+	if e.operationHistory == nil {
+		return []OperationRecord{}
+	}
+	return e.operationHistory.GetAll()
 }
