@@ -89,6 +89,67 @@ When AI agents fail (crashes, timeouts, tool errors), aisen automatically captur
 - **System state** (memory, goroutines)
 - **Conversation context** (links error to the exact turn via ContextID)
 - **Fingerprint** for grouping similar errors
+- **Operation history** (last 10 operations leading to the error)
+
+## Operation History
+
+When errors occur, aisen captures the last 10 operations (LLM calls and tool executions) that led to the failure. This provides a "breadcrumb trail" for debugging agent behavior and understanding failure patterns.
+
+### What's Captured
+
+For **LLM operations**, aisen records:
+- Model name and provider
+- Message count and metadata (role, length, flags)
+- Request parameters (temperature, max_tokens)
+- Tool definitions (names only, not schemas)
+- Response metadata (finish reason, token usage)
+- Duration
+
+For **tool operations**, aisen records:
+- Tool name and call ID
+- Input/output sizes
+- Duration
+- Scrubbed input/output (sensitive data removed)
+
+### What's NOT Captured
+
+For security and privacy:
+- **Message text is never stored** - only metadata (length, role, content type)
+- **Tool schemas are omitted** - only tool names
+- **All data is scrubbed** for API keys, tokens, passwords, and PII
+
+### Memory & Performance
+
+- **Bounded memory**: Maximum 10 operations, ~100KB worst case per error
+- **Minimal overhead**: <1ms per operation
+- **Automatic cleanup**: History cleared between runs
+- **Fail-closed scrubbing**: Invalid data is redacted, not exposed
+
+### Accessing Operation History
+
+**In cxdb portal**: Operation history appears as a top-level `operation_history` array in error details, showing the sequence of operations with full metadata.
+
+**In stderr sink** (verbose mode):
+```
+Operation History (2 operations):
+  1. [llm] 15:04:05 agent=researcher (1.234s)
+     Model: gpt-4 (openai)
+     Tokens: 100 prompt + 50 completion = 150 total
+     Finish: stop
+  2. [tool] 15:04:07 agent=researcher (0.567s)
+     Tool: WebSearch (id: call-123)
+     I/O: 42 bytes in, 1024 bytes out
+```
+
+**Programmatically**: Operation history is stored as JSON in `ErrorEvent.Metadata["aisen.operation_history_json"]` and can be parsed for custom analysis.
+
+### Use Cases
+
+- **Debug intermittent failures**: See the exact sequence of LLM calls and tool executions
+- **Analyze token usage**: Track cumulative token consumption leading to errors
+- **Performance investigation**: Identify slow operations that preceded crashes
+- **Cost attribution**: Understand token costs of failed attempts
+- **Pattern detection**: Identify common operation sequences that trigger errors
 
 ## Architecture
 
