@@ -1,5 +1,5 @@
 sprint_id	title	status	created_at	updated_at
-001	Operation History with Full LLM Call Details	in_progress	2026-01-07T00:00:00Z	2026-01-29T00:28:43Z
+001	Operation History with Full LLM Call Details	completed	2026-01-07T00:00:00Z	2026-01-29T01:02:20Z
 002	WAL Write Path + Segment Management	completed	2026-01-07T00:00:00Z	2026-01-07T21:09:46Z
 003	Architecture & Project Layout Hardening	completed	2026-01-07T21:13:09Z	2026-01-07T21:25:49Z
 004	Extract Kernel Crate	completed	2026-01-07T21:46:53Z	2026-01-09T05:46:28Z
