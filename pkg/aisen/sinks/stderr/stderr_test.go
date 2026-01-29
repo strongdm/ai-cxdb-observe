@@ -186,3 +186,81 @@ func TestStderrSink_SeverityFormatting(t *testing.T) {
 		})
 	}
 }
+
+// TestStderrSinkDisplaysOperationHistory verifies formatted history output in verbose mode.
+func TestStderrSinkDisplaysOperationHistory(t *testing.T) {
+	sink := NewStderrSink(WithVerbose())
+
+	historyJSON := `[{"kind":"llm","timestamp":"2025-01-26T15:00:00Z","duration_ms":1234,"agent_name":"agent1","llm":{"model":"gpt-4","provider":"openai","prompt_tokens":100,"completion_tokens":50}},{"kind":"tool","timestamp":"2025-01-26T15:00:01Z","duration_ms":567,"agent_name":"agent1","tool":{"name":"search","call_id":"call-123"}}]`
+
+	event := aisen.ErrorEvent{
+		EventID:   "evt-001",
+		Timestamp: time.Now(),
+		Severity:  aisen.SeverityError,
+		ErrorType: "test",
+		Message:   "test error",
+		Metadata: map[string]string{
+			"aisen.operation_history_json": historyJSON,
+		},
+	}
+
+	output := captureStderr(func() {
+		sink.Write(context.Background(), event)
+	})
+
+	// Verify operation history section is present
+	if !strings.Contains(output, "Operation History") {
+		t.Error("Output should contain 'Operation History' section")
+	}
+
+	// Verify LLM operation details
+	if !strings.Contains(output, "llm") {
+		t.Error("Output should show LLM operation kind")
+	}
+	if !strings.Contains(output, "gpt-4") {
+		t.Error("Output should show model name")
+	}
+	// Check for duration in any format (ms or seconds)
+	if !strings.Contains(output, "1234ms") && !strings.Contains(output, "1.234s") {
+		t.Errorf("Output should show LLM duration, got:\n%s", output)
+	}
+
+	// Verify tool operation details
+	if !strings.Contains(output, "tool") {
+		t.Error("Output should show tool operation kind")
+	}
+	if !strings.Contains(output, "search") {
+		t.Error("Output should show tool name")
+	}
+	// Check for duration in any format (ms or seconds)
+	if !strings.Contains(output, "567ms") && !strings.Contains(output, "0.567s") {
+		t.Errorf("Output should show tool duration, got:\n%s", output)
+	}
+}
+
+// TestStderrSinkSkipsHistoryInNonVerboseMode verifies history omitted without verbose.
+func TestStderrSinkSkipsHistoryInNonVerboseMode(t *testing.T) {
+	sink := NewStderrSink() // No WithVerbose()
+
+	historyJSON := `[{"kind":"llm","llm":{"model":"gpt-4"}}]`
+
+	event := aisen.ErrorEvent{
+		EventID:   "evt-002",
+		Timestamp: time.Now(),
+		Severity:  aisen.SeverityError,
+		ErrorType: "test",
+		Message:   "test error",
+		Metadata: map[string]string{
+			"aisen.operation_history_json": historyJSON,
+		},
+	}
+
+	output := captureStderr(func() {
+		sink.Write(context.Background(), event)
+	})
+
+	// Operation history should not be displayed in non-verbose mode
+	if strings.Contains(output, "Operation History") {
+		t.Error("Non-verbose mode should not display operation history")
+	}
+}
