@@ -93,6 +93,12 @@ func (c *defaultCollector) Record(ctx context.Context, event ErrorEvent) error {
 		event.Message = c.scrubber.ScrubMessage(event.Message)
 		event.StackTrace = c.scrubber.ScrubStackTrace(event.StackTrace)
 		event.Metadata = c.scrubber.ScrubMetadata(event.Metadata)
+
+		// Specifically scrub operation history JSON if present
+		if historyJSON, ok := event.Metadata["aisen.operation_history_json"]; ok {
+			event.Metadata["aisen.operation_history_json"] = c.scrubber.ScrubOperationHistoryJSON(historyJSON)
+		}
+
 		// Tool args scrubbing could be added here if needed
 	}
 

@@ -259,3 +259,63 @@ func TestNewCollector_NilSink(t *testing.T) {
 	// Should not panic
 	_ = collector.Record(context.Background(), event)
 }
+
+// TestCollectorScrubsOperationHistory verifies operation history JSON is scrubbed.
+func TestCollectorScrubsOperationHistory(t *testing.T) {
+	sink := &testSink{}
+	collector := NewCollector(WithSink(sink), WithDefaultScrubbing())
+
+	// Create event with operation history containing sensitive data
+	event := ErrorEvent{
+		Severity:  SeverityError,
+		ErrorType: "test",
+		Message:   "test error",
+		Metadata: map[string]string{
+			"aisen.operation_history_json": `[{"kind":"llm","llm":{"api_key":"sk-secret123"}},{"kind":"tool","tool":{"password":"hidden"}}]`,
+		},
+	}
+
+	err := collector.Record(context.Background(), event)
+	if err != nil {
+		t.Fatalf("Record failed: %v", err)
+	}
+
+	events := sink.getEvents()
+	if len(events) != 1 {
+		t.Fatalf("Expected 1 event, got %d", len(events))
+	}
+
+	scrubbedHistory := events[0].Metadata["aisen.operation_history_json"]
+
+	// Verify sensitive data is redacted
+	if containsString(scrubbedHistory, "sk-secret123") {
+		t.Error("API key should be redacted in operation history")
+	}
+	if containsString(scrubbedHistory, "hidden") {
+		t.Error("Password should be redacted in operation history")
+	}
+	// Verify structure is preserved
+	if !containsString(scrubbedHistory, "[REDACTED]") {
+		t.Error("Scrubbed history should contain [REDACTED] markers")
+	}
+}
+
+// containsString checks if a string contains a substring (helper for tests).
+func containsString(s, substr string) bool {
+	return len(s) >= len(substr) && findSubstring(s, substr)
+}
+
+func findSubstring(s, substr string) bool {
+	if len(substr) == 0 {
+		return true
+	}
+	if len(s) < len(substr) {
+		return false
+	}
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}
