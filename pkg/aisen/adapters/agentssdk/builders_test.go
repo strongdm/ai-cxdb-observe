@@ -175,3 +175,97 @@ func TestBuildPanicEvent_PopulatesFromEnrichment(t *testing.T) {
 		t.Errorf("ContextID = %v, want 99999", event.ContextID)
 	}
 }
+
+// TestErrorEventIncludesOperationHistory verifies history is stored in metadata.
+func TestErrorEventIncludesOperationHistory(t *testing.T) {
+	enrichment := Enrichment{
+		AgentName: "test-agent",
+	}
+
+	// Record some operations
+	enrichment.RecordOperation(OperationRecord{
+		Kind:      "llm",
+		AgentName: "test-agent",
+		LLM:       &LLMOperation{Model: "gpt-4"},
+	})
+	enrichment.RecordOperation(OperationRecord{
+		Kind:      "tool",
+		AgentName: "test-agent",
+		Tool:      &ToolOperation{Name: "search"},
+	})
+
+	err := errors.New("test error")
+	event := buildErrorEvent(err, 0, enrichment)
+
+	// Check that metadata contains operation history JSON
+	if event.Metadata == nil {
+		t.Fatal("Metadata should not be nil")
+	}
+
+	historyJSON, ok := event.Metadata["aisen.operation_history_json"]
+	if !ok {
+		t.Fatal("Metadata should contain aisen.operation_history_json key")
+	}
+
+	// Verify it's valid JSON and contains expected operations
+	if !strings.Contains(historyJSON, `"kind":"llm"`) {
+		t.Errorf("History should contain LLM operation")
+	}
+	if !strings.Contains(historyJSON, `"kind":"tool"`) {
+		t.Errorf("History should contain tool operation")
+	}
+	if !strings.Contains(historyJSON, "gpt-4") {
+		t.Errorf("History should contain model name")
+	}
+	if !strings.Contains(historyJSON, "search") {
+		t.Errorf("History should contain tool name")
+	}
+}
+
+// TestErrorEventEmptyHistoryOmitsMetadata verifies omission when no operations.
+func TestErrorEventEmptyHistoryOmitsMetadata(t *testing.T) {
+	enrichment := Enrichment{
+		AgentName: "test-agent",
+	}
+	// No operations recorded
+
+	err := errors.New("test error")
+	event := buildErrorEvent(err, 0, enrichment)
+
+	// Metadata should either be nil or not contain the history key
+	if event.Metadata != nil {
+		if _, ok := event.Metadata["aisen.operation_history_json"]; ok {
+			t.Error("Empty history should not create metadata key")
+		}
+	}
+}
+
+// TestOperationHistoryClearedBetweenRuns verifies no cross-run leakage.
+func TestOperationHistoryClearedBetweenRuns(t *testing.T) {
+	store := NewEnrichmentStore()
+
+	// Run 1: record operations
+	store.Update("run-1", func(e *Enrichment) {
+		e.RecordOperation(OperationRecord{Kind: "llm", AgentName: "agent1"})
+	})
+
+	// Get run-1 enrichment
+	enrichment1, _ := store.Get("run-1")
+	history1 := enrichment1.GetOperationHistory()
+	if len(history1) != 1 {
+		t.Fatalf("Run 1 should have 1 operation, got %d", len(history1))
+	}
+
+	// Delete run-1 and create run-2
+	store.Delete("run-1")
+	store.Update("run-2", func(e *Enrichment) {
+		e.AgentName = "agent2"
+	})
+
+	// Get run-2 enrichment - should have no history
+	enrichment2, _ := store.Get("run-2")
+	history2 := enrichment2.GetOperationHistory()
+	if len(history2) != 0 {
+		t.Errorf("Run 2 should have no operations, got %d", len(history2))
+	}
+}

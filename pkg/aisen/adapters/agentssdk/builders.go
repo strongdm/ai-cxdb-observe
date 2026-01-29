@@ -4,6 +4,7 @@ package agentssdk
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"runtime/debug"
@@ -27,6 +28,9 @@ func buildErrorEvent(err error, contextID uint64, enrichment Enrichment) aisen.E
 		event.ContextID = &contextID
 	}
 
+	// Attach operation history if available
+	attachOperationHistory(&event, enrichment)
+
 	return event
 }
 
@@ -46,6 +50,9 @@ func buildPanicEvent(recovered any, contextID uint64, enrichment Enrichment) ais
 	if contextID != 0 {
 		event.ContextID = &contextID
 	}
+
+	// Attach operation history if available
+	attachOperationHistory(&event, enrichment)
 
 	return event
 }
@@ -130,4 +137,30 @@ func formatRecovered(recovered any) string {
 		return err.Error()
 	}
 	return fmt.Sprintf("%v", recovered)
+}
+
+// attachOperationHistory attaches operation history from enrichment to the error event metadata.
+// If no operations are recorded, the metadata key is omitted.
+func attachOperationHistory(event *aisen.ErrorEvent, enrichment Enrichment) {
+	history := enrichment.GetOperationHistory()
+
+	// Skip if no operations recorded
+	if len(history) == 0 {
+		return
+	}
+
+	// Serialize to JSON
+	historyJSON, err := json.Marshal(history)
+	if err != nil {
+		// On marshal error, don't attach history (fail gracefully)
+		return
+	}
+
+	// Initialize metadata if needed
+	if event.Metadata == nil {
+		event.Metadata = make(map[string]string)
+	}
+
+	// Store as JSON string
+	event.Metadata["aisen.operation_history_json"] = string(historyJSON)
 }
