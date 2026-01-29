@@ -291,3 +291,128 @@ func TestCXDBSink_Flush(t *testing.T) {
 		t.Errorf("Flush returned error: %v", err)
 	}
 }
+
+// TestCXDBSinkSurfacesOperationHistory verifies operation history is parsed and surfaced.
+func TestCXDBSinkSurfacesOperationHistory(t *testing.T) {
+	client := &mockCXDBClient{}
+	sink := NewCXDBSink(client)
+
+	historyJSON := `[{"kind":"llm","agent_name":"agent1","llm":{"model":"gpt-4","prompt_tokens":100}},{"kind":"tool","agent_name":"agent1","tool":{"name":"search","call_id":"call-123"}}]`
+
+	contextID := uint64(12345)
+	event := aisen.ErrorEvent{
+		EventID:   "evt-001",
+		Severity:  aisen.SeverityError,
+		ErrorType: "test",
+		Message:   "test error with history",
+		Timestamp: time.Now(),
+		ContextID: &contextID,
+		Metadata: map[string]string{
+			"aisen.operation_history_json": historyJSON,
+		},
+	}
+
+	err := sink.Write(context.Background(), event)
+	if err != nil {
+		t.Fatalf("Write failed: %v", err)
+	}
+
+	reqs := client.getAppendRequests()
+	if len(reqs) != 1 {
+		t.Fatalf("Expected 1 append request, got %d", len(reqs))
+	}
+
+	// Decode the payload
+	var item cxdtypes.ConversationItem
+	err = cxdbclient.DecodeMsgpackInto(reqs[0].Payload, &item)
+	if err != nil {
+		t.Fatalf("Failed to decode payload: %v", err)
+	}
+
+	// Parse the Content JSON
+	var details map[string]any
+	err = json.Unmarshal([]byte(item.System.Content), &details)
+	if err != nil {
+		t.Fatalf("Failed to parse content JSON: %v", err)
+	}
+
+	// Verify operation_history is present as an array (not a string)
+	historyField, ok := details["operation_history"]
+	if !ok {
+		t.Fatal("Content should contain operation_history field")
+	}
+
+	history, ok := historyField.([]any)
+	if !ok {
+		t.Fatalf("operation_history should be an array, got %T", historyField)
+	}
+
+	if len(history) != 2 {
+		t.Errorf("Expected 2 operations in history, got %d", len(history))
+	}
+
+	// Verify first operation is LLM
+	op1, ok := history[0].(map[string]any)
+	if !ok {
+		t.Fatal("First operation should be a map")
+	}
+	if op1["kind"] != "llm" {
+		t.Errorf("First operation kind = %v, want llm", op1["kind"])
+	}
+
+	// Verify second operation is tool
+	op2, ok := history[1].(map[string]any)
+	if !ok {
+		t.Fatal("Second operation should be a map")
+	}
+	if op2["kind"] != "tool" {
+		t.Errorf("Second operation kind = %v, want tool", op2["kind"])
+	}
+}
+
+// TestCXDBSinkHandlesInvalidHistoryJSON verifies graceful handling of invalid JSON.
+func TestCXDBSinkHandlesInvalidHistoryJSON(t *testing.T) {
+	client := &mockCXDBClient{}
+	sink := NewCXDBSink(client)
+
+	contextID := uint64(12345)
+	event := aisen.ErrorEvent{
+		EventID:   "evt-002",
+		Severity:  aisen.SeverityError,
+		ErrorType: "test",
+		Message:   "test error",
+		Timestamp: time.Now(),
+		ContextID: &contextID,
+		Metadata: map[string]string{
+			"aisen.operation_history_json": "{invalid json",
+		},
+	}
+
+	err := sink.Write(context.Background(), event)
+	if err != nil {
+		t.Fatalf("Write should not fail on invalid history JSON: %v", err)
+	}
+
+	reqs := client.getAppendRequests()
+	if len(reqs) != 1 {
+		t.Fatalf("Expected 1 append request, got %d", len(reqs))
+	}
+
+	// Decode and verify operation_history is omitted
+	var item cxdtypes.ConversationItem
+	err = cxdbclient.DecodeMsgpackInto(reqs[0].Payload, &item)
+	if err != nil {
+		t.Fatalf("Failed to decode payload: %v", err)
+	}
+
+	var details map[string]any
+	err = json.Unmarshal([]byte(item.System.Content), &details)
+	if err != nil {
+		t.Fatalf("Failed to parse content JSON: %v", err)
+	}
+
+	// operation_history should be omitted for invalid JSON
+	if _, ok := details["operation_history"]; ok {
+		t.Error("Invalid history JSON should not create operation_history field")
+	}
+}

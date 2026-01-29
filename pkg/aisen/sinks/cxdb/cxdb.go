@@ -193,6 +193,17 @@ func buildErrorDetails(event aisen.ErrorEvent) string {
 		details["tokens_wasted"] = *event.TokensWasted
 	}
 	if len(event.Metadata) > 0 {
+		// Check for operation history JSON and parse it
+		if historyJSON, ok := event.Metadata["aisen.operation_history_json"]; ok {
+			var history []map[string]any
+			if err := json.Unmarshal([]byte(historyJSON), &history); err == nil {
+				// Successfully parsed - add as top-level field (as array, not string)
+				details["operation_history"] = history
+			}
+			// If parse fails, gracefully omit the field (no error)
+		}
+
+		// Include remaining metadata
 		details["metadata"] = event.Metadata
 	}
 
