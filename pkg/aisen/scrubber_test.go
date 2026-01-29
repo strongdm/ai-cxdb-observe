@@ -258,3 +258,120 @@ func TestScrubber_ScrubField_FailClosed(t *testing.T) {
 		t.Errorf("ScrubField should handle large inputs safely")
 	}
 }
+
+// TestScrubJSONRedactsAPIKeys verifies API keys are removed from nested JSON.
+func TestScrubJSONRedactsAPIKeys(t *testing.T) {
+	s := NewScrubber(DefaultScrubberConfig())
+
+	input := `{"tool":"search","args":{"api_key":"sk-secret123","query":"test"}}`
+	got := s.ScrubJSON(input)
+
+	if strings.Contains(got, "sk-secret123") {
+		t.Errorf("ScrubJSON should redact API key, got: %s", got)
+	}
+	if !strings.Contains(got, "[REDACTED]") {
+		t.Errorf("ScrubJSON should contain [REDACTED], got: %s", got)
+	}
+}
+
+// TestScrubJSONRedactsSensitiveKeys verifies sensitive key names cause value redaction.
+func TestScrubJSONRedactsSensitiveKeys(t *testing.T) {
+	s := NewScrubber(DefaultScrubberConfig())
+
+	tests := []struct {
+		name     string
+		input    string
+		dontWant string
+	}{
+		{"token key", `{"token":"abc123"}`, "abc123"},
+		{"password key", `{"password":"secret"}`, "secret"},
+		{"api_key key", `{"api_key":"xyz789"}`, "xyz789"},
+		{"nested secret", `{"config":{"secret":"hidden"}}`, "hidden"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := s.ScrubJSON(tt.input)
+			if strings.Contains(got, tt.dontWant) {
+				t.Errorf("ScrubJSON should redact sensitive value, got: %s", got)
+			}
+		})
+	}
+}
+
+// TestScrubJSONFailClosed verifies malformed JSON is redacted entirely.
+func TestScrubJSONFailClosed(t *testing.T) {
+	s := NewScrubber(DefaultScrubberConfig())
+
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{"invalid JSON", `{invalid json`},
+		{"unclosed brace", `{"key":"value"`},
+		{"trailing comma", `{"key":"value",}`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := s.ScrubJSON(tt.input)
+			if !strings.Contains(got, "[REDACTED:SCRUB_ERROR]") {
+				t.Errorf("ScrubJSON should fail closed on invalid JSON, got: %s", got)
+			}
+		})
+	}
+}
+
+// TestScrubJSONTruncatesOversized verifies size limiting with truncation marker.
+func TestScrubJSONTruncatesOversized(t *testing.T) {
+	s := NewScrubber(DefaultScrubberConfig())
+
+	// Create JSON > 16KB (MaxMetadataSize)
+	largeValue := strings.Repeat("x", 20000)
+	input := `{"data":"` + largeValue + `"}`
+
+	got := s.ScrubJSON(input)
+
+	if len(got) > 16384+100 { // Allow some overhead for markers
+		t.Errorf("ScrubJSON should truncate large JSON, got length: %d", len(got))
+	}
+	if !strings.Contains(got, "[TRUNCATED]") {
+		preview := got
+		if len(preview) > 100 {
+			preview = got[:100]
+		}
+		t.Errorf("ScrubJSON should include truncation marker, got: %s", preview)
+	}
+}
+
+// TestScrubOperationHistoryJSON verifies operation history scrubbing wrapper.
+func TestScrubOperationHistoryJSON(t *testing.T) {
+	s := NewScrubber(DefaultScrubberConfig())
+
+	input := `[{"kind":"llm","llm":{"api_key":"sk-secret"}},{"kind":"tool","tool":{"password":"hidden"}}]`
+	got := s.ScrubOperationHistoryJSON(input)
+
+	if strings.Contains(got, "sk-secret") {
+		t.Errorf("Should redact API key in operation history")
+	}
+	if strings.Contains(got, "hidden") {
+		t.Errorf("Should redact password in operation history")
+	}
+}
+
+// TestScrubJSONPreservesStructure verifies scrubbed JSON is still valid.
+func TestScrubJSONPreservesStructure(t *testing.T) {
+	s := NewScrubber(DefaultScrubberConfig())
+
+	input := `{"name":"tool1","safe_field":"ok","api_key":"secret"}`
+	got := s.ScrubJSON(input)
+
+	// Should still be valid JSON
+	if !strings.HasPrefix(got, "{") || !strings.HasSuffix(got, "}") {
+		t.Errorf("Scrubbed output should maintain JSON structure, got: %s", got)
+	}
+	// Safe fields should remain
+	if !strings.Contains(got, "safe_field") {
+		t.Errorf("Non-sensitive fields should be preserved, got: %s", got)
+	}
+}

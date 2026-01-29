@@ -3,6 +3,7 @@
 package aisen
 
 import (
+	"encoding/json"
 	"regexp"
 	"strings"
 )
@@ -217,4 +218,86 @@ func truncateWithMarker(s string, maxLen int) string {
 		return marker[:maxLen]
 	}
 	return s[:maxLen-len(marker)] + marker
+}
+
+// ScrubJSON recursively scrubs sensitive data from a JSON string.
+// Returns scrubbed JSON or "[REDACTED:SCRUB_ERROR]" on any error (fail-closed).
+func (s *Scrubber) ScrubJSON(jsonStr string) string {
+	maxSize := 16384 // 16KB limit for JSON fields
+
+	// Parse JSON into generic structure
+	var data interface{}
+	if err := json.Unmarshal([]byte(jsonStr), &data); err != nil {
+		// Fail closed: invalid JSON gets fully redacted
+		if s.cfg.FailClosed {
+			return "[REDACTED:SCRUB_ERROR]"
+		}
+		return jsonStr
+	}
+
+	// Recursively scrub the data
+	scrubbed := s.scrubJSONValue(data)
+
+	// Re-serialize to JSON
+	result, err := json.Marshal(scrubbed)
+	if err != nil {
+		// Fail closed on marshal error
+		if s.cfg.FailClosed {
+			return "[REDACTED:SCRUB_ERROR]"
+		}
+		return jsonStr
+	}
+
+	// Truncate after marshalling if too large
+	resultStr := string(result)
+	if len(resultStr) > maxSize {
+		resultStr = truncateWithMarker(resultStr, maxSize)
+	}
+
+	return resultStr
+}
+
+// scrubJSONValue recursively scrubs a JSON value (map, array, or primitive).
+func (s *Scrubber) scrubJSONValue(val interface{}) interface{} {
+	switch v := val.(type) {
+	case map[string]interface{}:
+		return s.scrubJSONMap(v)
+	case []interface{}:
+		return s.scrubJSONArray(v)
+	case string:
+		return s.ScrubMessage(v) // Apply message scrubbing to string values
+	default:
+		return v // Numbers, booleans, null pass through
+	}
+}
+
+// scrubJSONMap scrubs a JSON object (map).
+func (s *Scrubber) scrubJSONMap(m map[string]interface{}) map[string]interface{} {
+	result := make(map[string]interface{}, len(m))
+	for key, value := range m {
+		// If key is sensitive, redact the entire value
+		if s.isSensitiveKey(key) {
+			result[key] = "[REDACTED]"
+		} else {
+			// Recursively scrub the value
+			result[key] = s.scrubJSONValue(value)
+		}
+	}
+	return result
+}
+
+// scrubJSONArray scrubs a JSON array.
+func (s *Scrubber) scrubJSONArray(arr []interface{}) []interface{} {
+	result := make([]interface{}, len(arr))
+	for i, value := range arr {
+		result[i] = s.scrubJSONValue(value)
+	}
+	return result
+}
+
+// ScrubOperationHistoryJSON scrubs operation history JSON stored in metadata.
+// This is a convenience wrapper around ScrubJSON for the specific use case
+// of scrubbing operation history before it's sent to sinks.
+func (s *Scrubber) ScrubOperationHistoryJSON(historyJSON string) string {
+	return s.ScrubJSON(historyJSON)
 }
